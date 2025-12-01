@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using CmdPalKeyboardService;
 using CommunityToolkit.Mvvm.Messaging;
-using ManagedCommon;
 using Microsoft.CmdPal.Core.Common.Helpers;
 using Microsoft.CmdPal.Core.Common.Services;
 using Microsoft.CmdPal.Core.ViewModels.Messages;
@@ -18,6 +17,7 @@ using Microsoft.CmdPal.UI.Messages;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI;
 using Microsoft.UI.Composition;
@@ -66,6 +66,7 @@ public sealed partial class MainWindow : WindowEx,
     private readonly KeyboardListener _keyboardListener;
     private readonly LocalKeyboardListener _localKeyboardListener;
     private readonly HiddenOwnerWindowBehavior _hiddenOwnerBehavior = new();
+    private readonly ILogger logger = App.Current.Services.GetRequiredService<ILogger>();
     private bool _ignoreHotKeyWhenFullScreen = true;
 
     private DesktopAcrylicController? _acrylicController;
@@ -363,7 +364,7 @@ public sealed partial class MainWindow : WindowEx,
     /// A window rectangle in physical pixels, moved to the nearest display and resized
     /// if the DPI has changed.
     /// </returns>
-    private static RectInt32 EnsureWindowIsVisible(RectInt32 windowRect, SizeInt32 originalScreen, int originalDpi)
+    private RectInt32 EnsureWindowIsVisible(RectInt32 windowRect, SizeInt32 originalScreen, int originalDpi)
     {
         var displayArea = DisplayArea.GetFromRect(windowRect, DisplayAreaFallback.Nearest);
         if (displayArea is null)
@@ -435,7 +436,7 @@ public sealed partial class MainWindow : WindowEx,
         return new RectInt32(targetX, targetY, targetWidth, targetHeight);
     }
 
-    private static int GetEffectiveDpiFromDisplayId(DisplayArea displayArea)
+    private int GetEffectiveDpiFromDisplayId(DisplayArea displayArea)
     {
         var effectiveDpi = 96;
 
@@ -449,7 +450,7 @@ public sealed partial class MainWindow : WindowEx,
             }
             else
             {
-                Logger.LogWarning($"GetDpiForMonitor failed with HRESULT: 0x{hr.Value:X8} on display {displayArea.DisplayId}");
+                LogWarning_GetDpiForMonitorFailed(hr, displayArea);
             }
         }
 
@@ -590,7 +591,7 @@ public sealed partial class MainWindow : WindowEx,
             var hr = PInvoke.DwmSetWindowAttribute(_hwnd, DWMWINDOWATTRIBUTE.DWMWA_CLOAK, &value, (uint)sizeof(BOOL));
             if (hr.Failed)
             {
-                Logger.LogWarning($"DWM cloaking of the main window failed. HRESULT: {hr.Value}.");
+                Log_DwmCloakingFailed(hr);
             }
 
             wasCloaked = hr.Succeeded;
@@ -780,12 +781,12 @@ public sealed partial class MainWindow : WindowEx,
                             var settings = App.Current.Services.GetService<SettingsModel>();
                             if (settings?.AllowExternalReload == true)
                             {
-                                Logger.LogInfo("External Reload triggered");
+                                Log_ExternalReloadTriggered();
                                 WeakReferenceMessenger.Default.Send<ReloadCommandsMessage>(new());
                             }
                             else
                             {
-                                Logger.LogInfo("External Reload is disabled");
+                                Log_ExternalReloadDisabled();
                             }
 
                             return;
@@ -804,17 +805,11 @@ public sealed partial class MainWindow : WindowEx,
             // if the args are not valid or not passed correctly.
             if (ex.HResult is RPC_S_SERVER_UNAVAILABLE or RPC_S_CALL_FAILED)
             {
-                Logger.LogWarning(
-                    $"COM exception (HRESULT {ex.HResult}) when accessing activation arguments. " +
-                    $"This might be due to the calling application not passing them correctly or exiting before we could read them. " +
-                    $"The application will continue running and fall back to showing the Command Palette window.");
+                Log_COMExceptionAccessingActivationArguments(ex.HResult);
             }
             else
             {
-                Logger.LogError(
-                    $"COM exception (HRESULT {ex.HResult}) when activating the application. " +
-                    $"The application will continue running and fall back to showing the Command Palette window.",
-                    ex);
+                Log_COMExceptionActivationApplication(ex.HResult);
             }
         }
 
@@ -1001,4 +996,26 @@ public sealed partial class MainWindow : WindowEx,
         _localKeyboardListener.Dispose();
         DisposeAcrylic();
     }
+
+    [LoggerMessage(level: LogLevel.Warning, Message = "GetDpiForMonitor failed with HRESULT: 0x{hr.Value:X8} on display {DisplayArea.DisplayId}")]
+    partial void LogWarning_GetDpiForMonitorFailed(HRESULT hr, DisplayArea displayArea);
+
+    [LoggerMessage(level: LogLevel.Warning, Message = "DWM cloaking of the main window failed. HRESULT: {hr.Value}.")]
+    partial void Log_DwmCloakingFailed(HRESULT hr);
+
+    [LoggerMessage(level: LogLevel.Information, Message = "External Reload triggered")]
+    partial void Log_ExternalReloadTriggered();
+
+    [LoggerMessage(level: LogLevel.Information, Message = "External Reload is disabled")]
+    partial void Log_ExternalReloadDisabled();
+
+    [LoggerMessage(
+        level: LogLevel.Error,
+        Message = "COM exception (HRESULT {HResult}) when accessing activation arguments. This might be due to the calling application not passing them correctly or exiting before we could read them. The application will continue running and fall back to showing the Command Palette window.")]
+    partial void Log_COMExceptionAccessingActivationArguments(int hResult);
+
+    [LoggerMessage(
+        level: LogLevel.Error,
+        Message = "COM exception (HRESULT {HResult}) when activating the application. The application will continue running and fall back to showing the Command Palette window.")]
+    partial void Log_COMExceptionActivationApplication(int hResult);
 }

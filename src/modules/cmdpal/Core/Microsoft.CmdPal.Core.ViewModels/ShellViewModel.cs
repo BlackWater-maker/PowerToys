@@ -6,10 +6,10 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using Microsoft.CmdPal.Core.Common;
 using Microsoft.CmdPal.Core.ViewModels.Messages;
 using Microsoft.CmdPal.Core.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.CmdPal.Core.ViewModels;
 
@@ -18,10 +18,11 @@ public partial class ShellViewModel : ObservableObject,
     IRecipient<HandleCommandResultMessage>
 {
     private readonly IRootPageService _rootPageService;
-    private readonly IAppHostService _appHostService;
+    private readonly AppExtensionHost _appHost;
     private readonly TaskScheduler _scheduler;
     private readonly IPageViewModelFactoryService _pageViewModelFactory;
     private readonly Lock _invokeLock = new();
+    private readonly ILogger _logger;
     private Task? _handleInvokeTask;
 
     // Cancellation token source for page loading/navigation operations
@@ -60,7 +61,7 @@ public partial class ShellViewModel : ObservableObject,
                     }
                     catch (Exception ex)
                     {
-                        CoreLogger.LogError(ex.ToString());
+                        Log_Exception(ex);
                     }
                 }
             }
@@ -87,15 +88,17 @@ public partial class ShellViewModel : ObservableObject,
         TaskScheduler scheduler,
         IRootPageService rootPageService,
         IPageViewModelFactoryService pageViewModelFactory,
-        IAppHostService appHostService)
+        AppExtensionHost appHost,
+        ILogger logger)
     {
         _pageViewModelFactory = pageViewModelFactory;
         _scheduler = scheduler;
         _rootPageService = rootPageService;
-        _appHostService = appHostService;
+        _appHost = appHost;
+        _logger = logger;
 
-        NullPage = new NullPageViewModel(_scheduler, appHostService.GetDefaultHost());
-        _currentPage = new LoadingPageViewModel(null, _scheduler, appHostService.GetDefaultHost());
+        NullPage = new NullPageViewModel(_scheduler, appHost, _logger);
+        _currentPage = new LoadingPageViewModel(null, _scheduler, appHost, _logger);
 
         // Register to receive messages
         WeakReferenceMessenger.Default.Register<PerformCommandMessage>(this);
@@ -162,7 +165,7 @@ public partial class ShellViewModel : ObservableObject,
                     {
                         if (viewModel.InitializeCommand.ExecutionTask.Exception is AggregateException ex)
                         {
-                            CoreLogger.LogError(ex.ToString());
+                            Log_Exception(ex);
                         }
                     }
                     else
@@ -180,7 +183,7 @@ public partial class ShellViewModel : ObservableObject,
                                         }
                                         catch (Exception ex)
                                         {
-                                            CoreLogger.LogError(ex.ToString());
+                                            Log_Exception(ex);
                                         }
                                     }
 
@@ -210,7 +213,7 @@ public partial class ShellViewModel : ObservableObject,
                     }
                     catch (Exception ex)
                     {
-                        CoreLogger.LogError(ex.ToString());
+                        Log_Exception(ex);
                     }
                 }
 
@@ -240,7 +243,7 @@ public partial class ShellViewModel : ObservableObject,
             }
             catch (Exception ex)
             {
-                CoreLogger.LogError(ex.ToString());
+                Log_Exception(ex);
             }
             finally
             {
@@ -256,7 +259,7 @@ public partial class ShellViewModel : ObservableObject,
             return;
         }
 
-        var host = _appHostService.GetHostForCommand(message.Context, CurrentPage.ExtensionHost);
+        var host = _appHost.GetHostForCommand(message.Context, CurrentPage.ExtensionHost);
 
         _rootPageService.OnPerformCommand(message.Context, !CurrentPage.IsNested, host);
 
@@ -264,16 +267,16 @@ public partial class ShellViewModel : ObservableObject,
         {
             if (command is IPage page)
             {
-                CoreLogger.LogDebug($"Navigating to page");
+                Log_NavigateToPage();
 
                 var isMainPage = command == _rootPage;
                 _isNested = !isMainPage;
 
                 // Construct our ViewModel of the appropriate type and pass it the UI Thread context.
-                var pageViewModel = _pageViewModelFactory.TryCreatePageViewModel(page, _isNested, host);
+                var pageViewModel = _pageViewModelFactory.TryCreatePageViewModel(page, _isNested, host, _logger);
                 if (pageViewModel is null)
                 {
-                    CoreLogger.LogError($"Failed to create ViewModel for page {page.GetType().Name}");
+                    Log_FailedToCreateViewModel(page.GetType().Name);
                     throw new NotSupportedException();
                 }
 
@@ -303,7 +306,7 @@ public partial class ShellViewModel : ObservableObject,
             }
             else if (command is IInvokableCommand invokable)
             {
-                CoreLogger.LogDebug($"Invoking command");
+                Log_InvokingCommand();
 
                 WeakReferenceMessenger.Default.Send<BeginInvokeMessage>();
                 StartInvoke(message, invokable, host);
@@ -369,7 +372,7 @@ public partial class ShellViewModel : ObservableObject,
         }
 
         var kind = result.Kind;
-        CoreLogger.LogDebug($"handling {kind.ToString()}");
+        Log_HandlingCommandResult(kind.ToString());
 
         WeakReferenceMessenger.Default.Send<CmdPalInvokeResultMessage>(new(kind));
         switch (kind)
@@ -460,4 +463,19 @@ public partial class ShellViewModel : ObservableObject,
     {
         _navigationCts?.Cancel();
     }
+
+    [LoggerMessage(Level = LogLevel.Error)]
+    partial void Log_Exception(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Navigating to page")]
+    partial void Log_NavigateToPage();
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to create ViewModel for page {PageTypeName}")]
+    partial void Log_FailedToCreateViewModel(string pageTypeName);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Invoking command")]
+    partial void Log_InvokingCommand();
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Handling {CommandResultKind}")]
+    partial void Log_HandlingCommandResult(string commandResultKind);
 }

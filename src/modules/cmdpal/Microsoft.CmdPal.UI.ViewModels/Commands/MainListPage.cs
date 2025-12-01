@@ -16,7 +16,6 @@ using Microsoft.CmdPal.UI.ViewModels.Messages;
 using Microsoft.CmdPal.UI.ViewModels.Properties;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Microsoft.CmdPal.UI.ViewModels.MainPage;
 
@@ -39,8 +38,10 @@ public partial class MainListPage : DynamicListPage,
         "com.microsoft.cmdpal.builtin.remotedesktop",
     ];
 
-    private readonly IServiceProvider _serviceProvider;
     private readonly TopLevelCommandManager _tlcManager;
+    private readonly SettingsModel _settingsModel;
+    private readonly AliasManager _aliasManager;
+    private readonly AppStateModel _appStateModel;
     private List<Scored<IListItem>>? _filteredItems;
     private List<Scored<IListItem>>? _filteredApps;
     private List<Scored<IListItem>>? _fallbackItems;
@@ -54,14 +55,16 @@ public partial class MainListPage : DynamicListPage,
 
     private CancellationTokenSource? _cancellationTokenSource;
 
-    public MainListPage(IServiceProvider serviceProvider)
+    public MainListPage(TopLevelCommandManager topLevelCommandManager, SettingsModel settingsModel, AliasManager aliasManager, AppStateModel appStateModel)
     {
         Title = Resources.builtin_home_name;
         Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.scale-200.png");
         PlaceholderText = Properties.Resources.builtin_main_list_page_searchbar_placeholder;
-        _serviceProvider = serviceProvider;
 
-        _tlcManager = _serviceProvider.GetService<TopLevelCommandManager>()!;
+        _aliasManager = aliasManager;
+        _appStateModel = appStateModel;
+
+        _tlcManager = topLevelCommandManager;
         _tlcManager.PropertyChanged += TlcManager_PropertyChanged;
         _tlcManager.TopLevelCommands.CollectionChanged += Commands_CollectionChanged;
 
@@ -79,9 +82,9 @@ public partial class MainListPage : DynamicListPage,
         WeakReferenceMessenger.Default.Register<ClearSearchMessage>(this);
         WeakReferenceMessenger.Default.Register<UpdateFallbackItemsMessage>(this);
 
-        var settings = _serviceProvider.GetService<SettingsModel>()!;
-        settings.SettingsChanged += SettingsChangedHandler;
-        HotReloadSettings(settings);
+        _settingsModel = settingsModel;
+        _settingsModel.SettingsChanged += SettingsChangedHandler;
+        HotReloadSettings(_settingsModel);
         _includeApps = _tlcManager.IsProviderActive(AllAppsCommandProvider.WellKnownId);
 
         IsLoading = true;
@@ -220,14 +223,12 @@ public partial class MainListPage : DynamicListPage,
         // Handle changes to the filter text here
         if (!string.IsNullOrEmpty(SearchText))
         {
-            var aliases = _serviceProvider.GetService<AliasManager>()!;
-
             if (token.IsCancellationRequested)
             {
                 return;
             }
 
-            if (aliases.CheckAlias(newSearch))
+            if (_aliasManager.CheckAlias(newSearch))
             {
                 if (_filteredItemsIncludesApps != _includeApps)
                 {
@@ -389,7 +390,7 @@ public partial class MainListPage : DynamicListPage,
                 }
             }
 
-            var history = _serviceProvider.GetService<AppStateModel>()!.RecentCommands!;
+            var history = _appStateModel.RecentCommands!;
             Func<string, IListItem, int> scoreItem = (a, b) => { return ScoreTopLevelItem(a, b, history); };
 
             // Produce a list of everything that matches the current filter.
@@ -484,9 +485,8 @@ public partial class MainListPage : DynamicListPage,
 
     private bool ActuallyLoading()
     {
-        var tlcManager = _serviceProvider.GetService<TopLevelCommandManager>()!;
         var allApps = AllAppsCommandProvider.Page;
-        return allApps.IsLoading || tlcManager.IsLoading;
+        return allApps.IsLoading || _tlcManager.IsLoading;
     }
 
     // Almost verbatim ListHelpers.ScoreListItem, but also accounting for the
@@ -581,10 +581,9 @@ public partial class MainListPage : DynamicListPage,
     public void UpdateHistory(IListItem topLevelOrAppItem)
     {
         var id = IdForTopLevelOrAppItem(topLevelOrAppItem);
-        var state = _serviceProvider.GetService<AppStateModel>()!;
-        var history = state.RecentCommands;
+        var history = _appStateModel.RecentCommands;
         history.AddHistoryItem(id);
-        AppStateModel.SaveState(state);
+        AppStateModel.SaveState(_appStateModel);
     }
 
     private static string IdForTopLevelOrAppItem(IListItem topLevelOrAppItem)
@@ -616,10 +615,9 @@ public partial class MainListPage : DynamicListPage,
         _tlcManager.PropertyChanged -= TlcManager_PropertyChanged;
         _tlcManager.TopLevelCommands.CollectionChanged -= Commands_CollectionChanged;
 
-        var settings = _serviceProvider.GetService<SettingsModel>();
-        if (settings is not null)
+        if (_settingsModel is not null)
         {
-            settings.SettingsChanged -= SettingsChangedHandler;
+            _settingsModel.SettingsChanged -= SettingsChangedHandler;
         }
 
         WeakReferenceMessenger.Default.UnregisterAll(this);

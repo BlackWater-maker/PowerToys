@@ -8,8 +8,11 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ManagedCommon;
+
 using Microsoft.CmdPal.UI.Helpers;
+using Microsoft.CmdPal.UI.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI;
 using Windows.System;
 using Windows.UI;
@@ -19,6 +22,8 @@ namespace Microsoft.CmdPal.UI.ViewModels;
 
 internal sealed partial class DevRibbonViewModel : ObservableObject
 {
+    private readonly LogWrapper logger;
+
     private const int MaxLogEntries = 2;
     private const string Release = "Release";
     private const string Debug = "Debug";
@@ -32,6 +37,7 @@ internal sealed partial class DevRibbonViewModel : ObservableObject
 
     public DevRibbonViewModel()
     {
+        logger = (LogWrapper)App.Current.Services.GetRequiredService<ILogger>();
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         Trace.Listeners.Add(new DevRibbonTraceListener(this));
 
@@ -74,7 +80,7 @@ internal sealed partial class DevRibbonViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenLogFileAsync()
     {
-        var logPath = Logger.CurrentLogFile;
+        var logPath = logger.CurrentLogFile;
         if (File.Exists(logPath))
         {
             await Launcher.LaunchUriAsync(new Uri(logPath));
@@ -84,7 +90,7 @@ internal sealed partial class DevRibbonViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenLogFolderAsync()
     {
-        var logFolderPath = Logger.CurrentVersionLogDirectoryPath;
+        var logFolderPath = logger.CurrentVersionLogDirectoryPath;
         if (Directory.Exists(logFolderPath))
         {
             await Launcher.LaunchFolderPathAsync(logFolderPath);
@@ -187,4 +193,7 @@ internal sealed partial class DevRibbonViewModel : ObservableObject
             }
         }
     }
+
+    [LoggerMessage(level: LogLevel.Information, Message = "DevRibbonViewModel initialized.")]
+    public partial void LogInitialized();
 }

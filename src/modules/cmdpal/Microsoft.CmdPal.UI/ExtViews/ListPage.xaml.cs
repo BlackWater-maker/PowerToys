@@ -4,7 +4,6 @@
 
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.Messaging;
-using ManagedCommon;
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.Core.ViewModels.Commands;
 using Microsoft.CmdPal.Core.ViewModels.Messages;
@@ -12,6 +11,7 @@ using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.Messages;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -32,6 +32,7 @@ public sealed partial class ListPage : Page,
     IRecipient<ActivateSecondaryCommandMessage>
 {
     private InputSource _lastInputSource;
+    private ILogger logger = App.Current.Services.GetService<ILogger>()!;
 
     internal ListViewModel? ViewModel
     {
@@ -456,7 +457,7 @@ public sealed partial class ListPage : Page,
             }
             else if (e.NewValue is null)
             {
-                Logger.LogDebug("cleared view model");
+                Log_ClearedViewModel(@this.logger);
             }
         }
     }
@@ -576,4 +577,7 @@ public sealed partial class ListPage : Page,
         Keyboard,
         Pointer,
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Cleared view model")]
+    static partial void Log_ClearedViewModel(ILogger logger);
 }

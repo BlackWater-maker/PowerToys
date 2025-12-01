@@ -2,8 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using ManagedCommon;
-using Microsoft.CmdPal.Core.Common;
 using Microsoft.CmdPal.Core.Common.Helpers;
 using Microsoft.CmdPal.Core.Common.Services;
 using Microsoft.CmdPal.Core.ViewModels;
@@ -24,11 +22,13 @@ using Microsoft.CmdPal.Ext.WindowsTerminal;
 using Microsoft.CmdPal.Ext.WindowWalker;
 using Microsoft.CmdPal.Ext.WinGet;
 using Microsoft.CmdPal.UI.Helpers;
+using Microsoft.CmdPal.UI.Services;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.BuiltinCommands;
 using Microsoft.CmdPal.UI.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI.Xaml;
 
@@ -41,7 +41,8 @@ namespace Microsoft.CmdPal.UI;
 /// </summary>
 public partial class App : Application
 {
-    private readonly GlobalErrorHandler _globalErrorHandler = new();
+    private readonly GlobalErrorHandler _globalErrorHandler;
+    private readonly ILogger _logger;
 
     /// <summary>
     /// Gets the current <see cref="App"/> instance in use.
@@ -62,8 +63,11 @@ public partial class App : Application
     /// Initializes the singleton application object.  This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().
     /// </summary>
-    public App()
+    public App(ILogger logger)
     {
+        _logger = logger;
+        _globalErrorHandler = new(logger);
+
 #if !CMDPAL_DISABLE_GLOBAL_ERROR_HANDLER
         _globalErrorHandler.Register(this);
 #endif
@@ -82,11 +86,6 @@ public partial class App : Application
                 AppWindow?.Close();
                 Environment.Exit(0);
             });
-
-        // Connect the PT logging to the core project's logging.
-        // This way, log statements from the core project will be captured by the PT logs
-        var logWrapper = new LogWrapper();
-        CoreLogger.InitializeLogger(logWrapper);
     }
 
     /// <summary>
@@ -104,13 +103,20 @@ public partial class App : Application
     /// <summary>
     /// Configures the services for the application
     /// </summary>
-    private static ServiceProvider ConfigureServices()
+    private ServiceProvider ConfigureServices()
     {
         // TODO: It's in the Labs feed, but we can use Sergio's AOT-friendly source generator for this: https://github.com/CommunityToolkit/Labs-Windows/discussions/463
         ServiceCollection services = new();
 
         // Root services
+        services.AddSingleton<ILogger>(_logger);
         services.AddSingleton(TaskScheduler.FromCurrentSynchronizationContext());
+
+        // Load settings and state
+        var sm = SettingsModel.LoadSettings();
+        services.AddSingleton(sm);
+        var state = AppStateModel.LoadState();
+        services.AddSingleton(state);
 
         // Built-in Commands. Order matters - this is the order they'll be presented by default.
         var allApps = new AllAppsCommandProvider();
@@ -141,8 +147,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            Logger.LogError("Couldn't load winget");
-            Logger.LogError(ex.ToString());
+            Log_FailureToLoadWinget(ex);
         }
 
         services.AddSingleton<ICommandProvider, WindowsTerminalCommandsProvider>();
@@ -158,16 +163,12 @@ public partial class App : Application
         services.AddSingleton<TopLevelCommandManager>();
         services.AddSingleton<AliasManager>();
         services.AddSingleton<HotkeyManager>();
-        var sm = SettingsModel.LoadSettings();
-        services.AddSingleton(sm);
-        var state = AppStateModel.LoadState();
-        services.AddSingleton(state);
         services.AddSingleton<IExtensionService, ExtensionService>();
         services.AddSingleton<TrayIconService>();
         services.AddSingleton<IRunHistoryService, RunHistoryService>();
 
         services.AddSingleton<IRootPageService, PowerToysRootPageService>();
-        services.AddSingleton<IAppHostService, PowerToysAppHostService>();
+        services.AddSingleton<AppExtensionHost, CommandPaletteHost>();
         services.AddSingleton<ITelemetryService, TelemetryForwarder>();
 
         // ViewModels
@@ -176,4 +177,7 @@ public partial class App : Application
 
         return services.BuildServiceProvider();
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Couldn't load winget")]
+    partial void Log_FailureToLoadWinget(Exception ex);
 }

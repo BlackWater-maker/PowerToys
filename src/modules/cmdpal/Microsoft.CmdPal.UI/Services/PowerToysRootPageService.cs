@@ -4,55 +4,58 @@
 
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using ManagedCommon;
 using Microsoft.CmdPal.Core.Common.Services;
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CmdPal.UI.ViewModels.MainPage;
 using Microsoft.CommandPalette.Extensions;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using WinRT;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
-namespace Microsoft.CmdPal.UI;
+namespace Microsoft.CmdPal.UI.Services;
 
-internal sealed class PowerToysRootPageService : IRootPageService
+internal sealed partial class PowerToysRootPageService : IRootPageService
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger logger;
+    private readonly TopLevelCommandManager _topLevelCommandManager;
     private IExtensionWrapper? _activeExtension;
     private Lazy<MainListPage> _mainListPage;
 
-    public PowerToysRootPageService(IServiceProvider serviceProvider)
+    public PowerToysRootPageService(
+        TopLevelCommandManager topLevelCommandManager,
+        AliasManager aliasManager,
+        SettingsModel settingsModel,
+        AppStateModel appStateModel,
+        ILogger logger)
     {
-        _serviceProvider = serviceProvider;
+        this.logger = logger;
+        _topLevelCommandManager = topLevelCommandManager;
 
         _mainListPage = new Lazy<MainListPage>(() =>
         {
-            return new MainListPage(_serviceProvider);
+            return new MainListPage(topLevelCommandManager, settingsModel, aliasManager, appStateModel);
         });
     }
 
     public async Task PreLoadAsync()
     {
-        var tlcManager = _serviceProvider.GetService<TopLevelCommandManager>()!;
-        await tlcManager.LoadBuiltinsAsync();
+        await _topLevelCommandManager.LoadBuiltinsAsync();
     }
 
-    public Microsoft.CommandPalette.Extensions.IPage GetRootPage()
+    public IPage GetRootPage()
     {
         return _mainListPage.Value;
     }
 
     public async Task PostLoadRootPageAsync()
     {
-        var tlcManager = _serviceProvider.GetService<TopLevelCommandManager>()!;
-
         // After loading built-ins, and starting navigation, kick off a thread to load extensions.
-        tlcManager.LoadExtensionsCommand.Execute(null);
+        _topLevelCommandManager.LoadExtensionsCommand.Execute(null);
 
-        await tlcManager.LoadExtensionsCommand.ExecutionTask!;
-        if (tlcManager.LoadExtensionsCommand.ExecutionTask.Status != TaskStatus.RanToCompletion)
+        await _topLevelCommandManager.LoadExtensionsCommand.ExecutionTask!;
+        if (_topLevelCommandManager.LoadExtensionsCommand.ExecutionTask.Status != TaskStatus.RanToCompletion)
         {
             // TODO: Handle failure case
         }
@@ -69,8 +72,7 @@ internal sealed class PowerToysRootPageService : IRootPageService
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to update history in PowerToysRootPageService");
-            Logger.LogError(ex.ToString());
+            Log_ErrorUpdatingHistory(ex);
         }
     }
 
@@ -111,13 +113,13 @@ internal sealed class PowerToysRootPageService : IRootPageService
                         var hr = Native.CoAllowSetForegroundWindow(intPtr);
                         if (hr != 0)
                         {
-                            Logger.LogWarning($"Error giving foreground rights: 0x{hr.Value:X8}");
+                            Log_FailureToGiveForegroundRights(hr);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    ManagedCommon.Logger.LogError(ex.ToString());
+                    Log_ErrorSettingActiveExtension(ex);
                 }
             }
         }
@@ -141,4 +143,13 @@ internal sealed class PowerToysRootPageService : IRootPageService
         [SupportedOSPlatform("windows5.0")]
         internal static extern unsafe global::Windows.Win32.Foundation.HRESULT CoAllowSetForegroundWindow(nint pUnk, [Optional] void* lpvReserved);
     }
+
+    [LoggerMessage(Level = LogLevel.Error)]
+    partial void Log_ErrorSettingActiveExtension(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to update history in PowerToysRootPageService")]
+    partial void Log_ErrorUpdatingHistory(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Error giving foreground rights: 0x{hr.Value:X8}")]
+    partial void Log_FailureToGiveForegroundRights(global::Windows.Win32.Foundation.HRESULT hr);
 }

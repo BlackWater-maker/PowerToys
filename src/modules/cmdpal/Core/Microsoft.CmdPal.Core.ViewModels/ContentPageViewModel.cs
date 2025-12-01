@@ -11,6 +11,7 @@ using Microsoft.CmdPal.Core.ViewModels.Messages;
 using Microsoft.CmdPal.Core.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.CmdPal.Core.ViewModels;
 
@@ -47,8 +48,8 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
 
     // Remember - "observable" properties from the model (via PropChanged)
     // cannot be marked [ObservableProperty]
-    public ContentPageViewModel(IContentPage model, TaskScheduler scheduler, AppExtensionHost host)
-        : base(model, scheduler, host)
+    public ContentPageViewModel(IContentPage model, TaskScheduler scheduler, AppExtensionHost host, ILogger logger)
+        : base(model, scheduler, host, logger)
     {
         _model = new(model);
     }
@@ -115,7 +116,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
                 {
                     if (item is ICommandContextItem contextItem)
                     {
-                        return new CommandContextItemViewModel(contextItem, PageContext);
+                        return new CommandContextItemViewModel(contextItem, PageContext, Logger);
                     }
                     else
                     {
@@ -135,7 +136,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
         var extensionDetails = model.Details;
         if (extensionDetails is not null)
         {
-            Details = new(extensionDetails, PageContext);
+            Details = new(extensionDetails, PageContext, Logger);
             Details.InitializeProperties();
         }
 
@@ -174,7 +175,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
                             {
                                 if (item is ICommandContextItem contextItem)
                                 {
-                                    return new CommandContextItemViewModel(contextItem, PageContext) as IContextItemViewModel;
+                                    return new CommandContextItemViewModel(contextItem, PageContext, Logger) as IContextItemViewModel;
                                 }
                                 else
                                 {
@@ -216,7 +217,7 @@ public partial class ContentPageViewModel : PageViewModel, ICommandBarContext
                 break;
             case nameof(Details):
                 var extensionDetails = model.Details;
-                Details = extensionDetails is not null ? new(extensionDetails, PageContext) : null;
+                Details = extensionDetails is not null ? new(extensionDetails, PageContext, Logger) : null;
                 UpdateDetails();
                 break;
         }

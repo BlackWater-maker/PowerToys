@@ -7,7 +7,6 @@ using CommunityToolkit.WinUI;
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.Core.ViewModels.Commands;
 using Microsoft.CmdPal.Core.ViewModels.Messages;
-using Microsoft.CmdPal.UI.Messages;
 using Microsoft.CmdPal.UI.Views;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
@@ -239,7 +238,6 @@ public sealed partial class SearchBar : UserControl,
                 FilterBox.Text = _lastText ?? string.Empty;
                 FilterBox.Select(FilterBox.Text.Length, 0);
 
-                // Logger.LogInfo("deleting suggestion");
                 _inSuggestion = false;
                 _lastText = null;
 
@@ -266,7 +264,6 @@ public sealed partial class SearchBar : UserControl,
                 return;
             }
 
-            // Logger.LogInfo("leaving suggestion");
             _inSuggestion = false;
             _lastText = null;
         }
@@ -283,8 +280,6 @@ public sealed partial class SearchBar : UserControl,
 
     private void FilterBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        // Logger.LogInfo($"FilterBox_TextChanged: {FilterBox.Text}");
-
         // TERRIBLE HACK TODO GH #245
         // There's weird wacky bugs with debounce currently. We're trying
         // to get them ingested, but while we wait for the toolkit feeds to
@@ -299,7 +294,6 @@ public sealed partial class SearchBar : UserControl,
 
         if (InSuggestion)
         {
-            // Logger.LogInfo($"-- skipping, in suggestion --");
             return;
         }
 
@@ -321,7 +315,6 @@ public sealed partial class SearchBar : UserControl,
     {
         if (InSuggestion)
         {
-            // Logger.LogInfo($"--- skipping ---");
             return;
         }
 
@@ -385,7 +378,6 @@ public sealed partial class SearchBar : UserControl,
 
             if (clearSuggestion && _inSuggestion)
             {
-                // Logger.LogInfo($"Cleared suggestion \"{_lastText}\" to {suggestion}");
                 _inSuggestion = false;
                 FilterBox.Text = _lastText ?? string.Empty;
                 _lastText = null;
@@ -411,14 +403,6 @@ public sealed partial class SearchBar : UserControl,
 
             _lastText = currentText;
 
-            // if (_inSuggestion)
-            // {
-            //     Logger.LogInfo($"Suggestion from \"{_lastText}\" to {suggestion}");
-            // }
-            // else
-            // {
-            //     Logger.LogInfo($"Entering suggestion from \"{_lastText}\" to {suggestion}");
-            // }
             _inSuggestion = true;
 
             var matchedChars = 0;

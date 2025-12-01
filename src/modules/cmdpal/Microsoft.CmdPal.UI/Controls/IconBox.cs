@@ -2,10 +2,10 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using ManagedCommon;
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.UI.Deferred;
-using Microsoft.Terminal.UI;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -21,6 +21,7 @@ namespace Microsoft.CmdPal.UI.Controls;
 public partial class IconBox : ContentControl
 {
     private readonly DispatcherQueue _queue = DispatcherQueue.GetForCurrentThread();
+    private readonly ILogger logger;
 
     /// <summary>
     /// Gets or sets the <see cref="IconSource"/> to display within the <see cref="IconBox"/>. Overwritten, if <see cref="SourceKey"/> is used instead.
@@ -59,6 +60,8 @@ public partial class IconBox : ContentControl
         IsTabStop = false;
         HorizontalContentAlignment = HorizontalAlignment.Center;
         VerticalContentAlignment = VerticalAlignment.Center;
+
+        logger = App.Current.Services.GetService<ILogger>()!;
     }
 
     private static void OnSourcePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -168,10 +171,13 @@ public partial class IconBox : ContentControl
                     {
                         // Exception from TryEnqueue bypasses the global error handler,
                         // and crashes the app.
-                        Logger.LogError("Failed to set icon", ex);
+                        Log_FailedToSetIcon(@this.logger, ex);
                     }
                 });
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to set icon")]
+    static partial void Log_FailedToSetIcon(ILogger logger, Exception ex);
 }

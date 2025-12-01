@@ -3,9 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.ComponentModel;
-using Microsoft.CmdPal.Core.Common;
 using Microsoft.CommandPalette.Extensions;
-using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace Microsoft.CmdPal.Core.ViewModels.Messages;
 
@@ -48,10 +46,6 @@ public interface IContextMenuContext : INotifyPropertyChanged
             {
                 var key = cmd.RequestedShortcut ?? new KeyChord(0, 0, 0);
                 var added = result.TryAdd(key, cmd);
-                if (!added)
-                {
-                    CoreLogger.LogWarning($"Ignoring duplicate keyboard shortcut {KeyChordHelpers.FormatForDebug(key)} on command '{cmd.Title ?? cmd.Name ?? "(unknown)"}'");
-                }
             }
         }
 

@@ -4,12 +4,14 @@
 
 using Microsoft.CmdPal.Core.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.CmdPal.Core.ViewModels;
 
 public partial class DetailsTagsViewModel(
     IDetailsElement _detailsElement,
-    WeakReference<IPageContext> context) : DetailsElementViewModel(_detailsElement, context)
+    WeakReference<IPageContext> context,
+    ILogger logger) : DetailsElementViewModel(_detailsElement, context, logger)
 {
     public List<TagViewModel> Tags { get; private set; } = [];
 
@@ -31,7 +33,7 @@ public partial class DetailsTagsViewModel(
             .Tags?
             .Select(t =>
         {
-            var vm = new TagViewModel(t, PageContext);
+            var vm = new TagViewModel(t, PageContext, Logger);
             vm.InitializeProperties();
             return vm;
         })

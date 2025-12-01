@@ -4,12 +4,14 @@
 
 using Microsoft.CmdPal.Core.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.CmdPal.Core.ViewModels;
 
 public partial class DetailsCommandsViewModel(
     IDetailsElement _detailsElement,
-    WeakReference<IPageContext> context) : DetailsElementViewModel(_detailsElement, context)
+    WeakReference<IPageContext> context,
+    ILogger logger) : DetailsElementViewModel(_detailsElement, context, logger)
 {
     public List<CommandViewModel> Commands { get; private set; } = [];
 
@@ -31,7 +33,7 @@ public partial class DetailsCommandsViewModel(
             .Commands?
             .Select(c =>
             {
-                var vm = new CommandViewModel(c, PageContext);
+                var vm = new CommandViewModel(c, PageContext, Logger);
                 vm.InitializeProperties();
                 return vm;
             })

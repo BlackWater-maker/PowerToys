@@ -7,7 +7,7 @@ using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.WinUI;
-using ManagedCommon;
+
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.Core.ViewModels.Messages;
 using Microsoft.CmdPal.UI.Events;
@@ -17,6 +17,7 @@ using Microsoft.CmdPal.UI.Settings;
 using Microsoft.CmdPal.UI.ViewModels;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.PowerToys.Telemetry;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
@@ -50,6 +51,8 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
     INotifyPropertyChanged,
     IDisposable
 {
+    private readonly ILogger logger = App.Current.Services.GetService<ILogger>()!;
+
     private readonly DispatcherQueue _queue = DispatcherQueue.GetForCurrentThread();
 
     private readonly DispatcherQueueTimer _debounceTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
@@ -179,7 +182,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex.ToString());
+                Log_Exception(ex);
             }
         });
     }
@@ -200,7 +203,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
             return;
         }
 
-        ConfirmResultViewModel vm = new(args, new(ViewModel.CurrentPage));
+        ConfirmResultViewModel vm = new(args, new(ViewModel.CurrentPage), logger);
         var initializeDialogTask = Task.Run(() => { InitializeConfirmationDialog(vm); });
         await initializeDialogTask;
 
@@ -488,13 +491,13 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                     break;
                 default:
                     ViewModel.CurrentPage = ViewModel.NullPage;
-                    Logger.LogWarning($"Invalid navigation target: AsyncNavigationRequest.{nameof(AsyncNavigationRequest.TargetViewModel)} must be {nameof(PageViewModel)}");
+                    Log_InvalidNavigationTarget(nameof(AsyncNavigationRequest.TargetViewModel), nameof(PageViewModel));
                     break;
             }
         }
         else
         {
-            Logger.LogWarning("Unrecognized target for shell navigation: " + e.Parameter);
+            Log_UnrecognizedNavigationTarget(e.Parameter);
         }
 
         if (e.Content is Page element)
@@ -580,7 +583,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError("Error during FocusAfterLoaded async focus work", ex);
+                        Log_ErrorDuringFocusAfterLoaded(ex);
                     }
                 },
                 token);
@@ -709,7 +712,7 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error handling mouse button press event", ex);
+            Log_ErrorHandlingMouseEvent(ex);
         }
     }
 
@@ -719,4 +722,19 @@ public sealed partial class ShellPage : Microsoft.UI.Xaml.Controls.Page,
         _focusAfterLoadedCts?.Dispose();
         _focusAfterLoadedCts = null;
     }
+
+    [LoggerMessage(Level = LogLevel.Error)]
+    partial void Log_Exception(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error handling mouse button press event")]
+    partial void Log_ErrorHandlingMouseEvent(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error during FocusAfterLoaded async focus work")]
+    partial void Log_ErrorDuringFocusAfterLoaded(Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Unrecognized target for shell navigation: {parameter}")]
+    partial void Log_UnrecognizedNavigationTarget(object? parameter);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Invalid navigation target: AsyncNavigationRequest.{targetViewModel} must be {pageViewModel}")]
+    partial void Log_InvalidNavigationTarget(string targetViewModel, string pageViewModel);
 }

@@ -4,7 +4,7 @@
 
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.WinUI;
-using ManagedCommon;
+
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CmdPal.UI.Helpers;
 using Microsoft.CmdPal.UI.ViewModels.Messages;
@@ -12,9 +12,6 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Windows.Win32;
 using Windows.Win32.Foundation;
-using Windows.Win32.Graphics.Dwm;
-using Windows.Win32.Graphics.Gdi;
-using Windows.Win32.UI.HiDpi;
 using Windows.Win32.UI.WindowsAndMessaging;
 using WinUIEx;
 using RS_ = Microsoft.CmdPal.UI.Helpers.ResourceLoaderInstance;
@@ -24,6 +21,7 @@ namespace Microsoft.CmdPal.UI;
 public sealed partial class ToastWindow : WindowEx,
     IRecipient<QuitMessage>
 {
+    // private readonly ILogger logger = App.Current.Services.GetRequiredService<ILogger>();
     private readonly HWND _hwnd;
     private readonly DispatcherQueueTimer _debounceTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
     private readonly HiddenOwnerWindowBehavior _hiddenOwnerWindowBehavior = new();
@@ -47,21 +45,20 @@ public sealed partial class ToastWindow : WindowEx,
         WeakReferenceMessenger.Default.Register<QuitMessage>(this);
     }
 
-    private static double GetScaleFactor(HWND hwnd)
-    {
-        try
-        {
-            var monitor = PInvoke.MonitorFromWindow(hwnd, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
-            _ = PInvoke.GetDpiForMonitor(monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var dpiX, out _);
-            return dpiX / 96.0;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Failed to get scale factor, error: {ex.Message}");
-            return 1.0;
-        }
-    }
-
+    // private static double GetScaleFactor(HWND hwnd)
+    // {
+    //    try
+    //    {
+    //        var monitor = PInvoke.MonitorFromWindow(hwnd, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
+    //        _ = PInvoke.GetDpiForMonitor(monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var dpiX, out _);
+    //        return dpiX / 96.0;
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        Log_FailedToGetScaleFactor(ex);
+    //        return 1.0;
+    //    }
+    // }
     private void PositionCentered()
     {
         this.SetWindowSize(ToastText.ActualWidth, ToastText.ActualHeight);
@@ -106,4 +103,7 @@ public sealed partial class ToastWindow : WindowEx,
         // This might come in on a background thread
         DispatcherQueue.TryEnqueue(() => Close());
     }
+
+    // [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to get scale factor")]
+    // static partial void Log_FailedToGetScaleFactor(Exception ex);
 }

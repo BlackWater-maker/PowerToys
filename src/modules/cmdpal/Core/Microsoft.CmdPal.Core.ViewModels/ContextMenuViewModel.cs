@@ -5,7 +5,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
-using Microsoft.CmdPal.Core.Common;
 using Microsoft.CmdPal.Core.ViewModels.Messages;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
@@ -139,10 +138,6 @@ public partial class ContextMenuViewModel : ObservableObject,
             {
                 var key = cmd.RequestedShortcut ?? new KeyChord(0, 0, 0);
                 var added = result.TryAdd(key, cmd);
-                if (!added)
-                {
-                    CoreLogger.LogWarning($"Ignoring duplicate keyboard shortcut {KeyChordHelpers.FormatForDebug(key)} on command '{cmd.Title ?? cmd.Name ?? "(unknown)"}'");
-                }
             }
         }
 

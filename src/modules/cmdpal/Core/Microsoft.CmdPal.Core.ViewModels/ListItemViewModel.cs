@@ -7,6 +7,7 @@ using Microsoft.CmdPal.Core.ViewModels.Commands;
 using Microsoft.CmdPal.Core.ViewModels.Models;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.CmdPal.Core.ViewModels;
 
@@ -59,8 +60,8 @@ public partial class ListItemViewModel : CommandItemViewModel
         }
     }
 
-    public ListItemViewModel(IListItem model, WeakReference<IPageContext> context)
-        : base(new(model), context)
+    public ListItemViewModel(IListItem model, WeakReference<IPageContext> context, ILogger logger)
+        : base(new(model), context, logger)
     {
         Model = new ExtensionObject<IListItem>(model);
     }
@@ -102,7 +103,7 @@ public partial class ListItemViewModel : CommandItemViewModel
         var extensionDetails = model.Details;
         if (extensionDetails is not null)
         {
-            Details = new(extensionDetails, PageContext);
+            Details = new(extensionDetails, PageContext, Logger);
             Details.InitializeProperties();
             UpdateProperty(nameof(Details));
             UpdateProperty(nameof(HasDetails));
@@ -139,7 +140,7 @@ public partial class ListItemViewModel : CommandItemViewModel
                 break;
             case nameof(model.Details):
                 var extensionDetails = model.Details;
-                Details = extensionDetails is not null ? new(extensionDetails, PageContext) : null;
+                Details = extensionDetails is not null ? new(extensionDetails, PageContext, Logger) : null;
                 Details?.InitializeProperties();
                 UpdateProperty(nameof(Details));
                 UpdateProperty(nameof(HasDetails));
@@ -189,7 +190,7 @@ public partial class ListItemViewModel : CommandItemViewModel
                 // Create the view model for the show details command
                 var showDetailsCommand = new ShowDetailsCommand(Details);
                 var showDetailsContextItem = new CommandContextItem(showDetailsCommand);
-                var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext);
+                var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext, Logger);
                 showDetailsContextItemViewModel.SlowInitializeProperties();
                 MoreCommands.Add(showDetailsContextItemViewModel);
             }
@@ -223,7 +224,7 @@ public partial class ListItemViewModel : CommandItemViewModel
             // Create the view model for the show details command
             var showDetailsCommand = new ShowDetailsCommand(Details);
             var showDetailsContextItem = new CommandContextItem(showDetailsCommand);
-            var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext);
+            var showDetailsContextItemViewModel = new CommandContextItemViewModel(showDetailsContextItem, PageContext, Logger);
             showDetailsContextItemViewModel.SlowInitializeProperties();
             MoreCommands.Add(showDetailsContextItemViewModel);
 
@@ -236,7 +237,7 @@ public partial class ListItemViewModel : CommandItemViewModel
     {
         var newTags = newTagsFromModel?.Select(t =>
         {
-            var vm = new TagViewModel(t, PageContext);
+            var vm = new TagViewModel(t, PageContext, Logger);
             vm.InitializeProperties();
             return vm;
         })

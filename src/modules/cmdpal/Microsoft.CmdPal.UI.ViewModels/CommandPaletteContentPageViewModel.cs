@@ -4,23 +4,27 @@
 
 using Microsoft.CmdPal.Core.ViewModels;
 using Microsoft.CommandPalette.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.CmdPal.UI.ViewModels;
 
 public partial class CommandPaletteContentPageViewModel : ContentPageViewModel
 {
-    public CommandPaletteContentPageViewModel(IContentPage model, TaskScheduler scheduler, AppExtensionHost host)
-        : base(model, scheduler, host)
+    private readonly ILogger logger;
+
+    public CommandPaletteContentPageViewModel(IContentPage model, TaskScheduler scheduler, AppExtensionHost host, ILogger logger)
+        : base(model, scheduler, host, logger)
     {
+        this.logger = logger;
     }
 
     public override ContentViewModel? ViewModelFromContent(IContent content, WeakReference<IPageContext> context)
     {
         ContentViewModel? viewModel = content switch
         {
-            IFormContent form => new ContentFormViewModel(form, context),
-            IMarkdownContent markdown => new ContentMarkdownViewModel(markdown, context),
-            ITreeContent tree => new ContentTreeViewModel(tree, context),
+            IFormContent form => new ContentFormViewModel(form, context, logger),
+            IMarkdownContent markdown => new ContentMarkdownViewModel(markdown, context, logger),
+            ITreeContent tree => new ContentTreeViewModel(tree, context, logger),
             _ => null,
         };
         return viewModel;

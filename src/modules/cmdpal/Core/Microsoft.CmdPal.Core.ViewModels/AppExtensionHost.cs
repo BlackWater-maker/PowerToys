@@ -4,9 +4,9 @@
 
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using Microsoft.CmdPal.Core.Common;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
+using Microsoft.Extensions.Logging;
 using Windows.Foundation;
 
 namespace Microsoft.CmdPal.Core.ViewModels;
@@ -14,6 +14,7 @@ namespace Microsoft.CmdPal.Core.ViewModels;
 public abstract partial class AppExtensionHost : IExtensionHost
 {
     private static readonly GlobalLogPageContext _globalLogPageContext = new();
+    private readonly ILogger _logger;
 
     private static ulong _hostingHwnd;
 
@@ -26,6 +27,11 @@ public abstract partial class AppExtensionHost : IExtensionHost
     public ObservableCollection<StatusMessageViewModel> StatusMessages { get; } = [];
 
     public static void SetHostHwnd(ulong hostHwnd) => _hostingHwnd = hostHwnd;
+
+    public AppExtensionHost(ILogger logger)
+    {
+        _logger = logger;
+    }
 
     public void DebugLog(string message)
     {
@@ -60,7 +66,7 @@ public abstract partial class AppExtensionHost : IExtensionHost
             return Task.CompletedTask.AsAsyncAction();
         }
 
-        CoreLogger.LogDebug(message.Message);
+        Log_DebugMessage(message.Message);
 
         _ = Task.Run(() =>
         {
@@ -96,7 +102,7 @@ public abstract partial class AppExtensionHost : IExtensionHost
 
     public void ProcessLogMessage(ILogMessage message)
     {
-        var vm = new LogMessageViewModel(message, _globalLogPageContext);
+        var vm = new LogMessageViewModel(message, _globalLogPageContext, _logger);
         vm.SafeInitializePropertiesSynchronous();
 
         Task.Factory.StartNew(
@@ -127,7 +133,7 @@ public abstract partial class AppExtensionHost : IExtensionHost
             return;
         }
 
-        var vm = new StatusMessageViewModel(message, new(_globalLogPageContext));
+        var vm = new StatusMessageViewModel(message, new(_globalLogPageContext), _logger);
         vm.SafeInitializePropertiesSynchronous();
 
         Task.Factory.StartNew(
@@ -158,6 +164,11 @@ public abstract partial class AppExtensionHost : IExtensionHost
     }
 
     public abstract string? GetExtensionDisplayName();
+
+    public abstract AppExtensionHost GetHostForCommand(object? context, AppExtensionHost? currentHost);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "{Message}")]
+    partial void Log_DebugMessage(string message);
 }
 
 public interface IAppHostService
