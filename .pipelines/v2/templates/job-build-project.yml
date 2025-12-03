@@ -267,6 +267,7 @@ jobs:
       configuration: $(BuildConfiguration)
       msbuildArchitecture: x64
       maximumCpuCount: true
+      customVersion: 18.0
     ${{ if eq(parameters.enableMsBuildCaching, true) }}:
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -290,6 +291,7 @@ jobs:
       configuration: $(BuildConfiguration)
       msbuildArchitecture: x64
       maximumCpuCount: true
+      customVersion: 18.0
 
   # Build PowerToys.DSC.exe for ARM64 (x64 uses existing binary from previous build)
   - task: VSBuild@1
@@ -302,6 +304,7 @@ jobs:
       configuration: $(BuildConfiguration)
       msbuildArchitecture: x64
       maximumCpuCount: true
+      customVersion: 18.0
 
   # Generate DSC manifests using PowerToys.DSC.exe
   - pwsh: |-
@@ -351,6 +354,7 @@ jobs:
       configuration: $(BuildConfiguration)
       msbuildArchitecture: x64
       maximumCpuCount: true
+      customVersion: 18.0
     ${{ if eq(parameters.enableMsBuildCaching, true) }}:
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -372,6 +376,7 @@ jobs:
       configuration: $(BuildConfiguration)
       msbuildArchitecture: x64
       maximumCpuCount: true
+      customVersion: 18.0
     ${{ if eq(parameters.enableMsBuildCaching, true) }}:
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -396,7 +401,8 @@ jobs:
         configuration: $(BuildConfiguration)
         msbuildArchitecture: x64
         maximumCpuCount: true
-
+        customVersion: 18.0
+        
   ### HACK: On ARM64 builds, building an app with Windows App SDK copies the x64 WebView2 dll instead of the ARM64 one. This task makes sure the right dll is used.
   - task: CopyFiles@2
     displayName: HACK Copy core WebView2 ARM64 dll to output directory
