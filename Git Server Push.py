@@ -1,3 +1,4 @@
 print ("Hello, World!")
-print ("New feature")
+print ("Newest feature")
 input ("press enter to continue")
+output = input ("type something:")
